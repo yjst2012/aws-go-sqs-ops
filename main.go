@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -12,8 +13,8 @@ import (
 
 const (
 	QueueUrl    = "https://sqs.ap-southeast-2.amazonaws.com/456511713453/SQS-Jeff-test-1.fifo"
-	Region      = "ap-southeast-2a"
-	CredPath    = "/Users/home/.aws/credentials"
+	Region      = "ap-southeast-2"
+	CredPath    = "/home/jeff/.aws/credentials"
 	CredProfile = "aws-cred-profile"
 )
 
@@ -26,18 +27,22 @@ func main() {
 	})
 
 	svc := sqs.New(sess)
+	begin := time.Now()
 
 	// Send message
 	send_params := &sqs.SendMessageInput{
-		MessageBody:  aws.String("message body"), // Required
-		QueueUrl:     aws.String(QueueUrl),       // Required
-		DelaySeconds: aws.Int64(0),               // (optional)
+		MessageBody:            aws.String("message body"), // Required
+		QueueUrl:               aws.String(QueueUrl),       // Required
+		DelaySeconds:           aws.Int64(0),               // (optional)
+		MessageGroupId:         aws.String("group1"),
+		MessageDeduplicationId: aws.String(time.Now().Format("2006-01-02_15:04:05.999999-07:00")),
 	}
 	send_resp, err := svc.SendMessage(send_params)
 	if err != nil {
 		fmt.Println(err)
 	}
 	fmt.Printf("[Send message] \n%v \n\n", send_resp)
+	fmt.Println("duration for send", time.Since(begin))
 
 	// Receive message
 	receive_params := &sqs.ReceiveMessageInput{
@@ -51,7 +56,7 @@ func main() {
 		log.Println(err)
 	}
 	fmt.Printf("[Receive message] \n%v \n\n", receive_resp)
-
+	fmt.Println("duration for send + receive", time.Since(begin))
 	// Delete message
 	for _, message := range receive_resp.Messages {
 		delete_params := &sqs.DeleteMessageInput{
@@ -65,4 +70,6 @@ func main() {
 		}
 		fmt.Printf("[Delete message] \nMessage ID: %s has beed deleted.\n\n", *message.MessageId)
 	}
+	fmt.Println("duration for send+rec+del", time.Since(begin))
+
 }
