@@ -58,37 +58,56 @@ func main() {
 	send_resp, err := svc.SendMessage(send_params)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 	fmt.Printf("[Send message] \n%v \n\n", send_resp)
 	fmt.Println("duration for send", time.Since(begin))
 
 	// Receive message
 	receive_params := &sqs.ReceiveMessageInput{
+		AttributeNames: []*string{
+			aws.String(sqs.MessageSystemAttributeNameSentTimestamp),
+		},
+		MessageAttributeNames: []*string{
+			aws.String(sqs.QueueAttributeNameAll),
+		},
 		QueueUrl:            aws.String(QueueUrl),
-		MaxNumberOfMessages: aws.Int64(3),
+		MaxNumberOfMessages: aws.Int64(10),
 		VisibilityTimeout:   aws.Int64(30),
 		WaitTimeSeconds:     aws.Int64(20), // long polling
 	}
 	receive_resp, err := svc.ReceiveMessage(receive_params)
 	if err != nil {
 		log.Println(err)
+		return
 	}
-	fmt.Printf("[Receive message] \n%v \n\n", receive_resp)
+	for _, msg := range receive_resp.Messages {
+		fmt.Printf("[Receive message] \n%v \n\n", msg)
+		for key, attr := range msg.MessageAttributes {
+			fmt.Println("attr: ", key)
+			switch *attr.DataType {
+			case "Binary":
+				fmt.Println("   with binary value:", string(attr.BinaryValue[0:10]))
+			case "String":
+				fmt.Println("   with string value:", *attr.StringValue)
+			default:
+				fmt.Println("   with unknowb data type ", attr.DataType)
+			}
+		}
+	}
 	fmt.Println("duration for send + receive", time.Since(begin))
 
-	/*	// Delete message
-		for _, message := range receive_resp.Messages {
-			delete_params := &sqs.DeleteMessageInput{
-				QueueUrl:      aws.String(QueueUrl),  // Required
-				ReceiptHandle: message.ReceiptHandle, // Required
-
-			}
-			_, err := svc.DeleteMessage(delete_params) // No response returned when successed.
-			if err != nil {
-				log.Println(err)
-			}
-			fmt.Printf("[Delete message] \nMessage ID: %s has beed deleted.\n\n", *message.MessageId)
+	for _, message := range receive_resp.Messages {
+		delete_params := &sqs.DeleteMessageInput{
+			QueueUrl:      aws.String(QueueUrl),  // Required
+			ReceiptHandle: message.ReceiptHandle, // Required
 		}
-		fmt.Println("duration for send+rec+del", time.Since(begin))
-	*/
+		_, err := svc.DeleteMessage(delete_params) // No response returned when successed.
+		if err != nil {
+			log.Println(err)
+		}
+		fmt.Printf("[Delete message] \nMessage ID: %s has beed deleted.\n\n", *message.MessageId)
+	}
+	fmt.Println("duration for send+rec+del", time.Since(begin))
+	return
 }
